@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BMS - Real-Time Battery Management Dashboard</title>
+  
+  <!-- FontAwesome for Premium Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts for Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for High-Fidelity Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="tab-dashboard">
+  <div class="app-container">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <i class="fa-solid fa-battery-three-quarters logo-icon"></i>
+        <span>BMS Control</span>
+      </div>
+      
+      <nav class="sidebar-menu">
+        <a href="#" class="menu-item active" id="menu-dashboard">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="menu-item" id="menu-cells">
+          <i class="fa-solid fa-cubes"></i>
+          <span>Cell Analysis</span>
+        </a>
+        <a href="#" class="menu-item" id="menu-history">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>History Log</span>
+        </a>
+        <a href="#" class="menu-item" id="menu-settings">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <div class="system-status-pill online">
+          <span class="pulse-dot"></span>
+          <span id="sync-status-text">Connected</span>
+        </div>
+        <p class="app-version">v1.2.0-Alpha</p>
+      </div>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Header -->
+      <header class="main-header">
+        <div class="header-title">
+          <h1>BMS Monitoring System</h1>
+          <p class="subtitle">LiFePO4 4S Smart Battery Pack Dashboard</p>
+        </div>
+        
+        <div class="header-actions">
+          <div class="connection-mode-toggle">
+            <span class="mode-label">Mode:</span>
+            <button id="toggle-source-btn" class="source-badge live">
+              <i class="fa-solid fa-wifi"></i> Live Sheet
+            </button>
+          </div>
+          
+          <div class="last-updated-container">
+            <span class="label">Last Data:</span>
+            <span id="last-updated-time">--:--:--</span>
+          </div>
+          
+          <div class="user-profile">
+            <i class="fa-regular fa-bell notification-bell"></i>
+            <div class="avatar-circle">OP</div>
+            <span class="username">Operator</span>
+          </div>
+        </div>
+      </header>
+      
+      <!-- Connection & Sync Manager -->
+      <section class="sync-banner-card card">
+        <div class="sync-header">
+          <div class="sync-title-group">
+            <i class="fa-brands fa-google-drive sync-icon"></i>
+            <h3>Google Sheets Sync Configuration</h3>
+          </div>
+          <div class="sync-actions-group">
+            <button id="btn-force-refresh" class="btn btn-secondary">
+              <i class="fa-solid fa-arrows-rotate"></i> Sync Now
+            </button>
+          </div>
+        </div>
+        <div class="sync-body">
+          <div class="input-group">
+            <label for="sheet-url-input">Spreadsheet CSV URL:</label>
+            <input type="text" id="sheet-url-input" value="https://docs.google.com/spreadsheets/d/1tqFWvo045HVpXSgFLqBXPpaD78cHqnO8JetVlJH4I8c/export?format=csv" placeholder="Paste published google sheets CSV URL here...">
+          </div>
+          <p class="sync-help-text"><i class="fa-solid fa-info-circle"></i> Data polling auto-refreshes every 5 seconds. If direct CORS is restricted, simulation fallback runs automatically.</p>
+        </div>
+      </section>
+      
+      <!-- BMS Threshold Settings Card -->
+      <section class="threshold-settings-card card">
+        <div class="sync-header">
+          <div class="sync-title-group">
+            <i class="fa-solid fa-sliders icon-cyan"></i>
+            <h3>BMS Alarm Threshold Configuration</h3>
+          </div>
+        </div>
+        <div class="sync-body">
+          <div class="threshold-settings-grid">
+            <div class="input-group">
+              <label for="set-delta">Cell Balancing Trigger Delta (V):</label>
+              <input type="number" id="set-delta" step="0.01" value="0.05" min="0.01" max="0.50">
+            </div>
+            <div class="input-group">
+              <label for="set-low-soc">Low SOC Protection Alert (%):</label>
+              <input type="number" id="set-low-soc" value="15" min="5" max="50">
+            </div>
+            <div class="input-group">
+              <label for="set-overvolt">Cell Over-voltage Limit (V):</label>
+              <input type="number" id="set-overvolt" step="0.05" value="3.65" min="3.40" max="3.80">
+            </div>
+            <div class="input-group">
+              <label for="set-undervolt">Cell Under-voltage Limit (V):</label>
+              <input type="number" id="set-undervolt" step="0.05" value="2.50" min="2.00" max="3.00">
+            </div>
+          </div>
+          <button id="btn-save-settings" class="btn" style="margin-top: 1.25rem;">
+            <i class="fa-solid fa-floppy-disk"></i> Apply Config
+          </button>
+        </div>
+      </section>
+      
+      <!-- Main Metrics Row -->
+      <section class="metrics-grid">
+        
+        <!-- State of Charge Card (Radial Style) -->
+        <div class="metric-card card soc-card">
+          <div class="card-header">
+            <h4>State of Charge</h4>
+            <span class="live-dot-indicator"><span class="pulse-red"></span>Live</span>
+          </div>
+          <div class="card-body radial-container">
+            <div class="radial-gauge-wrapper">
+              <svg class="radial-svg" viewBox="0 0 120 120">
+                <circle class="radial-bg-circle" cx="60" cy="60" r="50"></circle>
+                <circle class="radial-progress-circle" id="soc-radial-progress" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div class="radial-center-text">
+                <span id="soc-value-large" class="soc-text">0%</span>
+                <span class="soc-label">Capacity</span>
+              </div>
+            </div>
+            <div class="soc-details">
+              <div class="detail-row">
+                <span class="detail-label">Available:</span>
+                <span id="capacity-remaining" class="detail-val">0.00 Ah</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Total Design:</span>
+                <span class="detail-val">30.00 Ah</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- System Voltage Card -->
+        <div class="metric-card card">
+          <div class="card-header">
+            <h4>Pack Voltage</h4>
+            <i class="fa-solid fa-bolt icon-cyan"></i>
+          </div>
+          <div class="card-body">
+            <div class="primary-value-display">
+              <span id="pack-voltage" class="value">0.00</span>
+              <span class="unit">V</span>
+            </div>
+            <div class="sub-metrics-grid">
+              <div class="sub-metric">
+                <span class="sub-label">Cell Max</span>
+                <span id="cell-max-volts" class="sub-val text-green">0.00 V</span>
+              </div>
+              <div class="sub-metric">
+                <span class="sub-label">Cell Min</span>
+                <span id="cell-min-volts" class="sub-val text-red">0.00 V</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Charge/Discharge Current Card -->
+        <div class="metric-card card">
+          <div class="card-header">
+            <h4>System Current</h4>
+            <i class="fa-solid fa-wave-square icon-orange"></i>
+          </div>
+          <div class="card-body">
+            <div class="primary-value-display">
+              <span id="pack-current" class="value">0.00</span>
+              <span class="unit">A</span>
+            </div>
+            <div class="status-badge-container">
+              <span class="status-label">BMS Status:</span>
+              <span id="bms-status-badge" class="badge idle">Idle</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- State of Health / Safety Status Card -->
+        <div class="metric-card card">
+          <div class="card-header">
+            <h4>Pack Health (SOH)</h4>
+            <i class="fa-solid fa-heart-pulse icon-green"></i>
+          </div>
+          <div class="card-body">
+            <div class="primary-value-display">
+              <span id="pack-soh" class="value">0</span>
+              <span class="unit">%</span>
+            </div>
+            <div class="sub-metrics-grid">
+              <div class="sub-metric">
+                <span class="sub-label">Balance Delta</span>
+                <span id="cell-delta-volts" class="sub-val">0.00 V</span>
+              </div>
+              <div class="sub-metric">
+                <span class="sub-label">Alert Status</span>
+                <span id="alert-status-text" class="sub-val text-green">Normal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+      </section>
+      
+      <!-- Cells & Visual Pack Balance Section -->
+      <section class="cells-pack-section card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-microchip"></i> Pack Cell Balance & Voltage Monitoring</h3>
+          <span class="balance-status" id="pack-balance-desc">Cells Balanced</span>
+        </div>
+        <div class="card-body cells-visualization-area">
+          
+          <!-- Physical Battery Pack Layout Diagram -->
+          <div class="battery-pack-diagram">
+            <div class="battery-pack-frame">
+              
+              <!-- Cell 1 -->
+              <div class="cell-unit" id="cell-unit-1">
+                <div class="cell-top-cap"></div>
+                <div class="cell-body">
+                  <div class="cell-fill-bar" id="cell-fill-1"></div>
+                  <div class="cell-label-group">
+                    <span class="cell-title">CELL 1</span>
+                    <span class="cell-volt-text" id="cell-v-1">0.00 V</span>
+                    <span class="cell-percent-text" id="cell-p-1">0%</span>
+                  </div>
+                  <div class="cell-balance-glow" id="cell-bal-1">
+                    <i class="fa-solid fa-yin-yang fa-spin"></i> Balancing
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Cell 2 -->
+              <div class="cell-unit" id="cell-unit-2">
+                <div class="cell-top-cap"></div>
+                <div class="cell-body">
+                  <div class="cell-fill-bar" id="cell-fill-2"></div>
+                  <div class="cell-label-group">
+                    <span class="cell-title">CELL 2</span>
+                    <span class="cell-volt-text" id="cell-v-2">0.00 V</span>
+                    <span class="cell-percent-text" id="cell-p-2">0%</span>
+                  </div>
+                  <div class="cell-balance-glow" id="cell-bal-2">
+                    <i class="fa-solid fa-yin-yang fa-spin"></i> Balancing
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Cell 3 -->
+              <div class="cell-unit" id="cell-unit-3">
+                <div class="cell-top-cap"></div>
+                <div class="cell-body">
+                  <div class="cell-fill-bar" id="cell-fill-3"></div>
+                  <div class="cell-label-group">
+                    <span class="cell-title">CELL 3</span>
+                    <span class="cell-volt-text" id="cell-v-3">0.00 V</span>
+                    <span class="cell-percent-text" id="cell-p-3">0%</span>
+                  </div>
+                  <div class="cell-balance-glow" id="cell-bal-3">
+                    <i class="fa-solid fa-yin-yang fa-spin"></i> Balancing
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Cell 4 -->
+              <div class="cell-unit" id="cell-unit-4">
+                <div class="cell-top-cap"></div>
+                <div class="cell-body">
+                  <div class="cell-fill-bar" id="cell-fill-4"></div>
+                  <div class="cell-label-group">
+                    <span class="cell-title">CELL 4</span>
+                    <span class="cell-volt-text" id="cell-v-4">0.00 V</span>
+                    <span class="cell-percent-text" id="cell-p-4">0%</span>
+                  </div>
+                  <div class="cell-balance-glow" id="cell-bal-4">
+                    <i class="fa-solid fa-yin-yang fa-spin"></i> Balancing
+                  </div>
+                </div>
+              </div>
+              
+            </div>
+            
+            <div class="pack-connections-diagram">
+              <div class="busbar link-1-2"></div>
+              <div class="busbar link-2-3"></div>
+              <div class="busbar link-3-4"></div>
+              <div class="terminal terminal-negative"><span>-</span> NEG</div>
+              <div class="terminal terminal-positive"><span>+</span> POS</div>
+            </div>
+          </div>
+          
+          <!-- Cell Statistics Cards -->
+          <div class="cells-stats-panel">
+            <div class="stat-row">
+              <span class="stat-label">Maximum Cell:</span>
+              <span class="stat-value text-green" id="pack-max-cell-name">CELL 1 (0.00V)</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Minimum Cell:</span>
+              <span class="stat-value text-red" id="pack-min-cell-name">CELL 4 (0.00V)</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Max Pack Deviation:</span>
+              <span class="stat-value" id="pack-delta-desc">0.00 V</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Balancing Threshold:</span>
+              <span class="stat-value" id="lbl-bal-threshold">0.05 V</span>
+            </div>
+            <div class="balance-status-alert normal" id="balance-alert-box">
+              <i class="fa-solid fa-circle-check"></i>
+              <span id="balance-alert-text">Cell deviation is within healthy limits.</span>
+            </div>
+          </div>
+          
+        </div>
+      </section>
+      
+      <!-- AI Cell Analysis & Scientific Insights Section -->
+      <section class="ai-analysis-section card highlight-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-brain icon-cyan"></i> AI Cell Diagnosis & Scientific Insights</h3>
+          <span class="badge ai-badge"><i class="fa-solid fa-circle-nodes"></i> Real-time Inference</span>
+        </div>
+        <div class="card-body ai-body">
+          <div class="ai-report-box">
+            <div class="ai-avatar">
+              <i class="fa-solid fa-robot"></i>
+              <span>BMS AI</span>
+            </div>
+            <div class="ai-text-panel">
+              <p id="ai-diagnosis-text" class="ai-text">Analyzing pack characteristics...</p>
+              <div class="academic-insight-box">
+                <span class="insight-label"><i class="fa-solid fa-book-open"></i> Journal Literature Insight:</span>
+                <p id="ai-journal-reference" class="insight-text">Loading battery chemistry references...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Charts Section (Dual Layout) -->
+      <section class="charts-grid">
+        
+        <!-- Pack Voltage & Current Trend Chart -->
+        <div class="chart-card card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-chart-line"></i> Voltage & Current History</h3>
+            <span class="chart-legend">Pack Trend</span>
+          </div>
+          <div class="card-body chart-wrapper">
+            <canvas id="packTrendChart"></canvas>
+          </div>
+        </div>
+        
+        <!-- Cell Voltages Track Chart -->
+        <div class="chart-card card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-lines-leaning"></i> Individual Cell Voltages</h3>
+            <span class="chart-legend">Tracking Cell 1-4</span>
+          </div>
+          <div class="card-body chart-wrapper">
+            <canvas id="cellTrackChart"></canvas>
+          </div>
+        </div>
+        
+      </section>
+      
+      <!-- Data log table at the bottom -->
+      <section class="log-section card">
+        <div class="card-header flex-column-mobile">
+          <div class="log-title-group">
+            <h3><i class="fa-solid fa-database"></i> Real-time Log Stream</h3>
+          </div>
+          <div class="log-filters-group">
+            <span class="filter-label">Filter:</span>
+            <div class="btn-group" id="log-time-filters">
+              <button class="btn-filter" data-duration="30m">30m</button>
+              <button class="btn-filter" data-duration="1h">1h</button>
+              <button class="btn-filter" data-duration="3h">3h</button>
+              <button class="btn-filter" data-duration="6h">6h</button>
+              <button class="btn-filter" data-duration="12h">12h</button>
+              <button class="btn-filter" data-duration="24h">24h</button>
+              <button class="btn-filter" data-duration="7d">1w</button>
+              <button class="btn-filter" data-duration="30d">1M</button>
+              <button class="btn-filter active" data-duration="all">All</button>
+            </div>
+          </div>
+          <div class="table-actions">
+            <button id="btn-clear-stream" class="btn btn-icon-only" title="Clear view log"><i class="fa-solid fa-trash"></i></button>
+            <button id="btn-export-log" class="btn btn-icon-only" title="Export CSV"><i class="fa-solid fa-download"></i></button>
+          </div>
+        </div>
+        <div class="card-body table-responsive">
+          <table class="log-table" id="log-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Voltage (V)</th>
+                <th>Current (A)</th>
+                <th>SOC (%)</th>
+                <th>Cell 1 (V)</th>
+                <th>Cell 2 (V)</th>
+                <th>Cell 3 (V)</th>
+                <th>Cell 4 (V)</th>
+                <th>Health (%)</th>
+                <th>Remaining (Ah)</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body">
+              <!-- Dynamically populated rows -->
+              <tr class="empty-row"><td colspan="10">No data records received yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
+    </main>
+  </div>
+  
+  <!-- Dynamic Dashboard Controller Script -->
+  <script src="app.js"></script>
+</body>
+</html>
